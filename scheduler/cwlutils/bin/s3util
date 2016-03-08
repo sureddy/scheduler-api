@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+from urlparse import urlparse
+import os
+import argparse
+import subprocess
+import requests
+from multiprocessing import Pool
+
+
+def upload(args):
+    commands = []
+    pool = Pool(processes=args.processes)
+
+    for f in args.files:
+        commands.append(
+            ['aws', 's3', 'cp', f,
+             's3://{}/{}'.format(args.bucket, os.path.basename(f))])
+    pool.map_async(run_process, commands).get(99999999)
+    pool.close()
+    pool.join()
+
+
+def get_urls(ids, host, signpost_url):
+    paths = {}
+    for id in ids:
+        r = requests.get("{}/{}".format(signpost_url, id))
+        if r.status_code == 200:
+            loc = None
+            for url in r.json()['urls']:
+                parsed_url = urlparse(url)
+                if parsed_url.scheme == 's3' and\
+                        parsed_url.netloc == urlparse(host).netloc:
+                    loc = parsed_url.path[1:]
+                    break
+            if loc:
+                paths[loc] = id.split('/')[-1]
+            else:
+                raise Exception("id {} does not have a valid url".format(id))
+        else:
+            raise Exception("id {} not found".format(id))
+    return paths
+
+
+def download(args):
+    if not os.path.exists(args.path):
+        os.makedirs(args.path)
+    if args.keys:
+        paths = args.keys
+    else:
+        if not args.signpost_url:
+            args.signpost_url = os.getenv('SIGNPOST_URL')
+            if not args.signpost_url:
+                print "Please provide signpost url"
+                return
+        paths = get_urls(args.ids, args.s3_url, args.signpost_url)
+    commands = []
+    pool = Pool(processes=args.processes)
+    for path in paths:
+        if args.keys:
+            paths = path.split(os.path.sep)
+            bucket = paths[0]
+            key = os.path.sep.join(paths[1:]).replace('/', '_')
+
+            filedir = os.path.join(args.path, bucket)
+            filepath = os.path.join(filedir, key)
+            if not os.path.exists(filedir):
+                os.makedirs(filedir)
+        else:
+            filepath = os.path.join(args.path, paths[path])
+        commands.append(
+            ['aws', 's3', 'cp', "s3://{}".format(path),
+             filepath, '--endpoint', args.s3_url])
+    pool.map_async(run_process, commands).get(99999999)
+    pool.close()
+    pool.join()
+
+
+def run_process(commands):
+    subprocess.call(commands, env=os.environ)
+
+
+def run():
+    parser = argparse.ArgumentParser(description='S3 upload and download')
+
+    subparsers = parser.add_subparsers(dest='command')
+
+    download_parser = subparsers.add_parser("download")
+    download_parser.add_argument("--path", default='.')
+    group = download_parser.add_mutually_exclusive_group()
+    group.add_argument("--ids", nargs='+', type=str,
+                       help="ids which identify the data")
+    group.add_argument("--keys", nargs='+', type=str,
+                       help="s3 location, eg: /bucket/key")
+    download_parser.add_argument("--signpost-url")
+    add_general_arguments(download_parser)
+    upload_parser = subparsers.add_parser("upload")
+    upload_parser.add_argument("--files", nargs='+', type=str)
+    upload_parser.add_argument("--bucket", required=True)
+    add_general_arguments(upload_parser)
+
+    args = parser.parse_args()
+    if args.s3creds_path:
+        os.environ['AWS_CONFIG_FILE'] = args.s3creds_path
+
+    if args.command == 'download':
+        download(args)
+    elif args.command == 'upload':
+        upload(args)
+
+
+def add_general_arguments(parser):
+    parser.add_argument("--processes", type=int, default=5)
+
+    parser.add_argument("--s3-url", default=os.getenv('S3_URL')
+                        or 'https://s3.amazonaws.com')
+    parser.add_argument("--s3creds-path", help='file path to aws credentials')
+
+if __name__ == '__main__':
+    run()

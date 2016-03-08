@@ -1,0 +1,5 @@
+{
+  "example.s3creds_path": "/Users/yajing/.aws/credentials",
+  "example.bucket": "cdis-test",
+  "example.keys": ["cdis-test/util.html"]
+}

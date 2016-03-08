@@ -1,0 +1,5 @@
+{
+  "test.upload.files": ["abc", "README.md"],
+  "test.upload.s3creds_path": "/Users/yajing/.aws/credentials",
+  "test.upload.bucket": "cdis-test"
+}

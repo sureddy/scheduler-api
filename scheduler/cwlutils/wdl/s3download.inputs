@@ -1,0 +1,4 @@
+{
+  "test.download.keys": ["cdis-test/abc"],
+  "test.download.s3creds_path": "/Users/yajing/.aws/credentials"
+}
