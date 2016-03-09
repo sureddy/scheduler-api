@@ -3,6 +3,6 @@ setup(
     name="scheduler",
     packages=["scheduler"],
     package_data={
-        'scheduler': ['slurm/scripts/*'],
+        'scheduler': ['slurm/scripts/*', 'slurm/cwlutils/cwl/*'],
     }
 )

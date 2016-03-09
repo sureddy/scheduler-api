@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 from .job import blueprint as job
 from .cwl import blueprint as cwl
+from .resources.cwl import CWLLibrary
 from auth import check_user
 from errors import APIError
 from models.driver import SQLAlchemyDriver
@@ -14,6 +15,7 @@ def app_init(app):
     app.config.from_object('scheduler.settings')
     app.url_map.strict_slashes = False
     app.db = SQLAlchemyDriver(app.config['DB'])
+    app.cwl = CWLLibrary(app.config['ALLOWED_DOCKER_REGISTRIES'])
 
 app_init(app)
 

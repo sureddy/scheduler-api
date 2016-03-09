@@ -1,8 +1,8 @@
 import flask
 from pkg_resources import resource_filename
 from errors import UserError
-import slurm
-import cwl_util
+from resources import slurm
+from resources import cwl as cwl_util
 from flask import request, jsonify
 
 
