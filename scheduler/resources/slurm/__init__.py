@@ -44,11 +44,15 @@ def list_job():
     return {'jobs': parse_output(sys_call("squeue"))}
 
 
-def submit_job(script, command, args=[]):
+def submit_job(script, command, args=[], env={}):
     # args should be given before the script
     command = ["sbatch"] + args + [script] + command
-    result = sys_call(command)
+    result = sys_call(command, env=env)
     job_id = result.split()[-1]
+    with capp.db.session as s:
+        j = Job(id=job_id)
+        s.add(j)
+        s.commit()
     return {'job': job_id}
 
 
@@ -77,13 +81,18 @@ def get_job(jid):
         raise JobNotFound(jid)
 
 
-def update_job(jid, **kwargs):
+def update_job(jid, update={}):
+    if not update:
+        return
     get_job(jid)
     with capp.db.session as s:
         j = s.query(Job).get(jid)
         if not j:
             raise JobNotFound(jid)
         else:
-            j.update(**kwargs)
+            if 'log' in update:
+                j.log += update.get('log', '')
+                del update['log']
+            j.update(**update)
             s.merge(j)
             return j.todict()

@@ -1,9 +1,11 @@
 import flask
+import json
+import os
 from pkg_resources import resource_filename
 from errors import UserError
 from resources import slurm
-from resources import cwl as cwl_util
 from flask import request, jsonify
+from flask import current_app as capp
 
 
 blueprint = flask.Blueprint('job', __name__)
@@ -22,26 +24,129 @@ def cancel_job(jid):
 
 @blueprint.route("/", methods=['POST'])
 def create_job():
-    req_type = request.args.get('type', 'command')
-    payload = request.get_json()
-    if req_type == 'cwl':
-        command = cwl_util.construct_script(payload)
-        script = resource_filename('scheduler', 'slurm/scripts/cwl.py')
-        print script
+    """
+    Create a job.
+    :query type: type of the job, can be bash or cwl, default to command
+    ** Example of a bash job: **
+    .. code-block:: http
+        POST /job/ HTTP/1.1
+        Authorization: Basic QWxhZGRpbjpPcGVuU2VzYW1l
+    .. code-block:: Javascript
+        {
+            "command": "echo 'test'"
+        }
+    ** Example output: **
+    .. code-block:: http
+        HTTP/1.1 200
+        Content-Type: application/json
 
-    elif req_type == 'command':
+    .. code-block:: Javascript
+        {
+            "job": "445"
+        }
+
+    ** Example of a cwl job: **
+    A cwl job accept a json document of your workflow, and a json input, if
+    there are input of type File, you should give another json which has
+    the content of your files
+
+    Example workflow:
+    .. code-block:: yaml
+      class: CommandLineTool
+      requirements:
+      # DockerRequirement is required for scheduler API
+      - class: DockerRequirement
+        dockerPull: quay.io/cdis/cwlutils:s3cwl
+      inputs:
+        - id: "#echo-in"
+          type: File
+          label: "Message"
+          description: "The message to print"
+          inputBinding: {}
+      outputs:
+        - id: "#echo-out"
+          type: File
+          label: "Printed Message"
+          description: "The file containing the message"
+          outputBinding:
+            glob: messageout.txt
+
+      baseCommand: echo
+      stdout: messageout.txt
+
+    Example inputs:
+    .. code-block:: yaml
+        "echo-in":
+            class: File
+            # need to be a relative path
+            path: filea
+
+    Example input files:
+    .. code-block:: yaml
+        filea: content of the file
+
+    .. code-block:: http
+        POST /job/ HTTP/1.1
+        Authorization: Basic QWxhZGRpbjpPcGVuU2VzYW1l
+
+    .. code-block:: Javascript
+        {
+            "document": cwl json,
+            "inputs": input json,
+            "input_files": json which specify actual content of input files
+        }
+
+    ** Example output: **
+    .. code-block:: http
+        HTTP/1.1 200
+        Content-Type: application/json
+
+    .. code-block:: Javascript
+        {
+            "job": "445"
+        }
+
+    """
+    req_type = request.args.get('type', 'bash')
+    payload = request.get_json()
+    env = os.environ
+    if req_type == 'cwl':
+        command, env = capp.cwl.construct_script(payload)
+        script = resource_filename(
+            'scheduler', 'resources/slurm/scripts/cwl.py')
+
+    elif req_type == 'bash':
         command = [payload.get('command')]
-        script = resource_filename('scheduler', 'slurm/scripts/command.sh')
+        script = resource_filename(
+            'scheduler', 'resources/slurm/scripts/command.sh')
 
     else:
         raise UserError("{} type not supported".format(req_type))
-    return jsonify(slurm.submit_job(script, command, payload.get("args", [])))
+    return jsonify(
+        slurm.submit_job(script, command, payload.get("args", []), env=env))
 
 
 @blueprint.route("/<jid>", methods=['PUT'])
 def update_job(jid):
-    message = request.get_data()
-    return jsonify(slurm.update_job(jid, message=message))
+    """Update the status of a job.
+
+    Accepted keys in json payload:
+    log:            a log message that will be appended to job.log
+    running_state:  cwl workflow running step
+    output:         output of a job
+
+    """
+    try:
+        payload = json.loads(request.data)
+    except Exception as e:
+        raise UserError("Invalid json: {}".format(e))
+    allowed_keys = {"log", "running_state", "output"}
+    not_allowed = set(payload.keys()).difference(allowed_keys)
+    if not_allowed:
+        raise UserError(
+            "Keys: {} not allowed, only allow update"
+            "on: {}".format(not_allowed, allowed_keys))
+    return jsonify(slurm.update_job(jid, payload))
 
 
 @blueprint.route("/", methods=['GET'])

@@ -17,17 +17,35 @@ class DictMixin(object):
 
 class Job(DictMixin, Base):
     __tablename__ = 'job'
+    # job id created by slurm
     id = Column(String, primary_key=True)
+
+    # optionally set by user as an identifier
     job_name = Column(String)
+
+    # state of a job, get from slurm sacct
     state = Column(String)
-    message = Column(String)
+
+    # log stream of a job, reported real-time by
+    # resources/slurm/script/cwl.py on slurm workers
+    log = Column(String, default="")
+
+    # job output, reported by
+    # resources/slurm/script/cwl.py
+    output = Column(String)
+
+    # cwl workflow running step,
+    # reported by reousrces/slurm/script/cwl.py
+    running_state = Column(String)
+
+    # slurm exit code, get from slurm sacct
     exit_code = Column(Integer)
+
+    # nodelist of a job, get from slurm sacct
     nodelist = Column(String)
 
 
-class CWLFile(DictMixin, Base):
-    __tablename__ = "CWL_file"
-    id = Column(String, primary_key=True)
-    name = Column(String, unique=True)
-    description = Column(String)
-    content = Column(String)
+class User(DictMixin, Base):
+    __tablename__ = "user"
+    username = Column(String, primary_key=True)
+    password = Column(String)
