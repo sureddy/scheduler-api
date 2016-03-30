@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from .job import blueprint as job
 from .cwl import blueprint as cwl
 from .resources.cwl import CWLLibrary
-from auth import check_user
+from logging import log_request, log_response_code
 from errors import APIError
 from models.driver import SQLAlchemyDriver
 
@@ -20,14 +20,19 @@ def app_init(app):
 app_init(app)
 
 
+@app.before_request
+def before_req():
+    log_request()
+
+
+@app.after_request
+def after_req(response):
+    return log_response_code(response)
+
+
 @app.route('/')
 def root():
     return jsonify({'job endpoint': '/job', 'cwl endpoint': '/cwl'})
-
-
-@app.before_request
-def before_req():
-    check_user()
 
 
 @app.errorhandler(APIError)

@@ -1,5 +1,5 @@
 AUTH = True 
-DB = 'sqlite:///scheduler.sq3'
+DB = 'postgresql://test:test@localhost/schedulerapi'
 PROXIES = True
 
 ALLOWED_DOCKER_REGISTRIES = [

@@ -1,6 +1,7 @@
-from sqlalchemy import Integer, String, Column
+from sqlalchemy import Integer, String, Column, Boolean, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
-
+from sqlalchemy.schema import ForeignKey
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -39,13 +40,33 @@ class Job(DictMixin, Base):
     running_state = Column(String)
 
     # slurm exit code, get from slurm sacct
-    exit_code = Column(Integer)
+    exit_code = Column(String)
 
     # nodelist of a job, get from slurm sacct
     nodelist = Column(String)
+
+
+class RequestLog(DictMixin, Base):
+    # request payload
+    __tablename__ = "request_log"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(String, ForeignKey("job.id"))
+    job = relationship("Job", backref="requests")
+
+    # might be a user does not exist, so it's not a foreignkey
+    username = Column(String)
+
+    payload = Column(String)
+    url = Column(String)
+    method = Column(String)
+    status_code = Column(Integer)
+
+    timestamp = Column(DateTime(timezone=True), nullable=False, server_default=text('now()'))
 
 
 class User(DictMixin, Base):
     __tablename__ = "user"
     username = Column(String, primary_key=True)
     password = Column(String)
+    is_admin = Column(Boolean, default=False)

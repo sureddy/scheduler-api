@@ -86,11 +86,14 @@ def run_cwl(cwl, inputs, workflow_id, proxies):
                       .format(os.environ['SLURM_SUBMIT_HOST'], identifier))
 
         t = Thread(target=listen_output, args=(p.stderr, report_url))
-        t.daemon = True  # thread dies with the program
+        # was trying to set deamon=True but that will lose some of the last outputs
+        # as the program exit before last request is sent
+        # t.daemon = True
         t.start()
         p.wait()
         stdout = p.stdout.read()
         logger.info(stdout)
+
         if p.returncode == 0:
             report_to_scheduler(report_url, {"output": stdout})
             exit(0)
@@ -108,7 +111,10 @@ def report_to_scheduler(report_url, data):
         # use munge to encode data
         p = subprocess.Popen(
             ["munge", "-s", json.dumps(data)], stdout=subprocess.PIPE)
-        print requests.put(report_url, data=p.stdout.read()).text
+        r = requests.put(report_url, data=p.stdout.read())
+        if r.status_code != 200:
+            print r.text
+        time.sleep(5)
     except Exception as e:
         print "Fail to report to scheduler", e
 

@@ -10,6 +10,17 @@ GITHUB_CWL_ROOT = (
     "LabAdvComp/cwlutils/master/cwl/")
 
 
+class CWLDoc(dict):
+    def __getitem__(self, attr):
+        if attr in self:
+            value = super(CWLDoc, self).__getitem__(attr)
+            if type(value) == dict:
+                value = CWLDoc(value)
+            return value
+        else:
+            raise UserError("Missing {} in document".format(attr))
+
+
 class CWLLibrary(object):
 
     def __init__(self, allowed_registries):
@@ -46,12 +57,12 @@ class CWLLibrary(object):
             return self.validate_single_document(workflow_doc, local_steps)
         else:
             raise UserError("Invalid cwl: workflow has to be a dict or list")
-        return True
 
     def is_workflow(self, document):
         return document.get('class') == 'Workflow'
 
     def validate_single_document(self, document, local_steps=[]):
+        document = CWLDoc(document)
         doc_class = document.get('class')
         if not doc_class:
             raise UserError("Have to provide a class for your workflow")
@@ -63,46 +74,44 @@ class CWLLibrary(object):
             raise UserError("Class {} not supported".format(doc_class))
 
     def validate_workflow(self, document, local_steps=[]):
-        try:
-            for step in document['steps']:
-                import_cwl = step['run']['import']
-                # only support importing local steps or
-                # cwl that's in cdis cwlutils
-                if import_cwl in local_steps:
-                    continue
-                if import_cwl.startswith('http'):
-                    if import_cwl.startswith(GITHUB_CWL_ROOT):
-                        raise UserError(
-                            "Only allow import from {}"
-                            .format(GITHUB_CWL_ROOT))
-                else:
-                    cwl = self.get_cwl(import_cwl)
-                    # replace a local file reference with a github url
-                    step['run']['import'] = cwl['url']
-            return document['id']
-        except KeyError as e:
-            raise UserError("Missing {} in document".format(e))
+        document = CWLDoc(document)
+        for step in document['steps']:
+            step = CWLDoc(step)
+            import_cwl = step['run']['import']
+            # only support importing local steps or
+            # cwl that's in cdis cwlutils
+            if import_cwl in local_steps:
+                continue
+            if import_cwl.startswith('http'):
+                if import_cwl.startswith(GITHUB_CWL_ROOT):
+                    raise UserError(
+                        "Only allow import from {}"
+                        .format(GITHUB_CWL_ROOT))
+            else:
+                cwl = self.get_cwl(import_cwl)
+                # replace a local file reference with a github url
+                step['run']['import'] = cwl['url']
+        return document['id']
 
     def validate_commandline(self, document):
-        try:
-            has_docker_requirement = False
-            for req in document['requirements']:
-                if req['class'] == 'DockerRequirement':
-                    has_docker_requirement = True
-                    if not any(map(
-                            req['dockerPull'].startswith,
-                            self.allowed_registries)):
-                        raise UserError(
-                            'Pull docker from {} is not allowed,'
-                            'allowed registries are: {}'
-                            .format(req['dockerPull'],
-                                    self.allowed_registries))
+        document = CWLDoc(document)
+        has_docker_requirement = False
+        for req in document['requirements']:
+            req = CWLDoc(req)
+            if req['class'] == 'DockerRequirement':
+                has_docker_requirement = True
+                if not any(map(
+                        req['dockerPull'].startswith,
+                        self.allowed_registries)):
+                    raise UserError(
+                        'Pull docker from {} is not allowed,'
+                        'allowed registries are: {}'
+                        .format(req['dockerPull'],
+                                self.allowed_registries))
 
-            if not has_docker_requirement:
-                raise UserError("Have to use docker for CommandLineTool")
-            return document['id']
-        except KeyError as e:
-            raise UserError("Missing {} in document".format(e))
+        if not has_docker_requirement:
+            raise UserError("Have to use docker for CommandLineTool")
+        return document['id']
 
     def construct_script(self, payload):
         """

@@ -2,6 +2,7 @@ import flask
 import json
 import os
 from pkg_resources import resource_filename
+from auth import auth_by_munge, basic_auth, assert_admin
 from errors import UserError
 from resources import slurm
 from flask import request, jsonify
@@ -12,17 +13,20 @@ blueprint = flask.Blueprint('job', __name__)
 
 
 @blueprint.route("/<jid>", methods=['GET'])
+@basic_auth
 def get_job(jid):
     return jsonify(slurm.get_job(jid))
 
 
 @blueprint.route("/<jid>", methods=['DELETE'])
+@basic_auth
 def cancel_job(jid):
     slurm.cancel_job(jid)
     return "", 201
 
 
 @blueprint.route("/", methods=['POST'])
+@basic_auth
 def create_job():
     """
     Create a job.
@@ -54,9 +58,9 @@ def create_job():
     .. code-block:: yaml
       class: CommandLineTool
       requirements:
-      # DockerRequirement is required for scheduler API
-      - class: DockerRequirement
-        dockerPull: quay.io/cdis/cwlutils:s3cwl
+        # DockerRequirement is required for scheduler API
+        - class: DockerRequirement
+          dockerPull: quay.io/cdis/cwlutils:s3cwl
       inputs:
         - id: "#echo-in"
           type: File
@@ -116,6 +120,7 @@ def create_job():
             'scheduler', 'resources/slurm/scripts/cwl.py')
 
     elif req_type == 'bash':
+        assert_admin()
         command = [payload.get('command')]
         script = resource_filename(
             'scheduler', 'resources/slurm/scripts/command.sh')
@@ -127,6 +132,7 @@ def create_job():
 
 
 @blueprint.route("/<jid>", methods=['PUT'])
+@auth_by_munge
 def update_job(jid):
     """Update the status of a job.
 
@@ -138,7 +144,7 @@ def update_job(jid):
     """
     try:
         payload = json.loads(request.data)
-    except Exception as e:
+    except ValueError as e:
         raise UserError("Invalid json: {}".format(e))
     allowed_keys = {"log", "running_state", "output"}
     not_allowed = set(payload.keys()).difference(allowed_keys)
@@ -150,6 +156,7 @@ def update_job(jid):
 
 
 @blueprint.route("/", methods=['GET'])
+@basic_auth
 def list_job():
     '''Get active jobs'''
     return jsonify(slurm.list_job())
