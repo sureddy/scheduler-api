@@ -14,7 +14,19 @@ class InternalError(APIError):
         self.code = 500
 
 
-class JobNotFound(APIError):
+class NotFound(APIError):
+    def __init__(self, message):
+        self.message = str(message)
+        self.code = 404
+
+
+class JobNotFound(NotFound):
     def __init__(self, jid):
         self.message = "Job {} not found".format(jid)
         self.code = 404
+
+
+class UnauthorizedError(APIError):
+    def __init__(self, message):
+        self.message = str(message)
+        self.code = 403

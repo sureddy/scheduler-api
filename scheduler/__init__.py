@@ -1,7 +1,8 @@
 from flask import Flask, jsonify
 from .job import blueprint as job
 from .cwl import blueprint as cwl
-from auth import check_user
+from .resources.cwl import CWLLibrary
+from logging import log_request, log_response_code
 from errors import APIError
 from models.driver import SQLAlchemyDriver
 
@@ -14,18 +15,24 @@ def app_init(app):
     app.config.from_object('scheduler.settings')
     app.url_map.strict_slashes = False
     app.db = SQLAlchemyDriver(app.config['DB'])
+    app.cwl = CWLLibrary(app.config['ALLOWED_DOCKER_REGISTRIES'])
 
 app_init(app)
+
+
+@app.before_request
+def before_req():
+    log_request()
+
+
+@app.after_request
+def after_req(response):
+    return log_response_code(response)
 
 
 @app.route('/')
 def root():
     return jsonify({'job endpoint': '/job', 'cwl endpoint': '/cwl'})
-
-
-@app.before_request
-def before_req():
-    check_user()
 
 
 @app.errorhandler(APIError)
