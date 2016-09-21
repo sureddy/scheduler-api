@@ -1,0 +1,18 @@
+language: python
+
+python:
+  - "2.7"
+
+sudo: false
+cache: pip
+
+addons:
+  postgresql: '9.4'
+
+install:
+  - pip install -r requirements.txt
+  - pip install -r dev-requirements.txt
+  - psql -U postgres  -c "create database schedulerapi_test"
+
+script:
+  - "PYTHONPATH=. py.test -vv tests/"

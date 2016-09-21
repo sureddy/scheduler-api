@@ -9,15 +9,15 @@ from models.driver import SQLAlchemyDriver
 app = Flask(__name__)
 
 
-def app_init(app):
+def app_init(app, settings="scheduler.settings"):
+    print settings
     app.register_blueprint(job, url_prefix='/job')
     app.register_blueprint(cwl, url_prefix='/cwl')
-    app.config.from_object('scheduler.settings')
+    app.config.from_object(settings)
     app.url_map.strict_slashes = False
     app.db = SQLAlchemyDriver(app.config['DB'])
     app.cwl = CWLLibrary(app.config['ALLOWED_DOCKER_REGISTRIES'])
 
-app_init(app)
 
 
 @app.before_request
