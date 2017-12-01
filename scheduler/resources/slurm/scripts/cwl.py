@@ -70,6 +70,8 @@ def listen_output(stderr, report_url):
 def run_cwl(cwl, inputs, workflow_id, proxies):
     identifier = os.getenv('SLURM_JOB_ID', hashlib.sha1(str(time.time())))
     workdir = set_workdir(identifier)
+    report_url = ("http://{}:5000/job/{}"
+                  .format(os.environ['SLURM_SUBMIT_HOST'], identifier))
     try:
         cwl_file, input_file = setup_files(
             cwl, inputs, identifier)
@@ -82,8 +84,6 @@ def run_cwl(cwl, inputs, workflow_id, proxies):
                              stdout=subprocess.PIPE,
                              env=environ,
                              cwd=workdir)
-        report_url = ("http://{}:5000/job/{}"
-                      .format(os.environ['SLURM_SUBMIT_HOST'], identifier))
 
         t = Thread(target=listen_output, args=(p.stderr, report_url))
         # was trying to set deamon=True but that will lose some of the last outputs
