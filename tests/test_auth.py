@@ -1,9 +1,9 @@
 def test_authorized_call(client, test_user):
-    r = client.get("/cwl/", headers=test_user)
+    r = client.get("/jobs/", headers=test_user)
     print r.data
-    assert r.status_code == 200
+    assert r.status_code != 403
 
 
 def test_unauthorized_call(client, test_user):
-    r = client.get("/cwl/")
+    r = client.get("/jobs/")
     assert r.status_code == 403
