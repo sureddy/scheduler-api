@@ -123,7 +123,11 @@ class CWLLibrary(object):
         """
         if 'document' in payload:
             cwl_content = payload['document']
-            doc_id = self.validate(cwl_content)
+            # KMH: For GDC workflows, they are complex with subworkflows.
+            # We can use cwltool to pack, and by default it calls the main
+            # workflow '#main'. So, I will hardcode this here
+            #doc_id = self.validate(cwl_content)
+            doc_id = '#main'
         else:
             raise UserError("Need to provide cwl document")
         if 'inputs' in payload:
