@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, Column, Boolean, DateTime, text
+from sqlalchemy import Integer, String, Column, Boolean, text, DateTime, Float, BIGINT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import ForeignKey
 from sqlalchemy.orm import relationship
@@ -45,7 +45,31 @@ class Job(DictMixin, Base):
     # nodelist of a job, get from slurm sacct
     nodelist = Column(String)
 
+    ## Job statistics from sacct
+    ## YYYY-MM-DDTHH:MM:SS
+    submit_time = Column(DateTime)
 
+    start_time = Column(DateTime)
+
+    end_time = Column(DateTime)
+
+    elapsed_seconds = Column(BIGINT)
+
+    ## All of these should be MB as set in the sacct --units=M
+    ave_disk_read = Column(Float)
+    max_disk_read = Column(Float)
+    
+    ave_disk_write = Column(Float)
+    max_disk_write = Column(Float)
+
+    ave_rss = Column(Float)
+    max_rss = Column(Float)
+
+    ave_vm_size = Column(Float)
+    max_vm_size = Column(Float)
+
+    #TODO: cpu times
+     
 class RequestLog(DictMixin, Base):
     # request payload
     __tablename__ = "request_log"
