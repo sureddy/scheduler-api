@@ -70,6 +70,9 @@ def listen_output(stderr, report_url):
 def run_cwl(cwl, inputs, workflow_id, proxies):
     identifier = os.getenv('SLURM_JOB_ID', hashlib.sha1(str(time.time())))
     workdir = set_workdir(identifier)
+    #TODO: handle the user auth 
+    report_url = ("http://{}:5000/jobs/{}"
+                  .format(os.environ['SLURM_SUBMIT_HOST'], identifier))
     try:
         cwl_file, input_file = setup_files(
             cwl, inputs, identifier)
@@ -77,13 +80,14 @@ def run_cwl(cwl, inputs, workflow_id, proxies):
         environ['http_proxy'] = 'http://cloud-proxy:3128'
         environ['https_proxy'] = 'http://cloud-proxy:3128'
 
-        p = subprocess.Popen(["cwl-runner", cwl_file+workflow_id, input_file],
+        #TODO: allow user to provide cwl path
+        #TODO: allow user to provide CWL flags 
+        p = subprocess.Popen(["/home/ubuntu/.virtualenvs/p2/bin/cwltool", 
+                              cwl_file+workflow_id, input_file],
                              stderr=subprocess.PIPE,
                              stdout=subprocess.PIPE,
                              env=environ,
                              cwd=workdir)
-        report_url = ("http://{}:5000/job/{}"
-                      .format(os.environ['SLURM_SUBMIT_HOST'], identifier))
 
         t = Thread(target=listen_output, args=(p.stderr, report_url))
         # was trying to set deamon=True but that will lose some of the last outputs
