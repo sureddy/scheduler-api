@@ -153,7 +153,7 @@ def format_slurm_datetime(val):
 
 def format_slurm_mb_size(val):
     #NOTE: You must use --units=M in sacct! 
-    if val and val != 'Unknown':
+    if val and val != 'Unknown' and val != '0':
         # Should prob capture err
         assert val[-1] == 'M', "Expect MB but got {}".format(val)
         #try: 
