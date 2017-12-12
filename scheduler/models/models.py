@@ -1,4 +1,5 @@
 from sqlalchemy import Integer, String, Column, Boolean, text, DateTime, Float, BIGINT
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import ForeignKey
 from sqlalchemy.orm import relationship
@@ -30,6 +31,9 @@ class Job(DictMixin, Base):
     # log stream of a job, reported real-time by
     # resources/slurm/script/cwl.py on slurm workers
     log = Column(String, default="")
+
+    # job input as JSON
+    input = Column(JSON(none_as_null=True))
 
     # job output, reported by
     # resources/slurm/script/cwl.py

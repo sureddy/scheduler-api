@@ -44,7 +44,7 @@ def list_job():
     return {'jobs': parse_output(sys_call("squeue"))}
 
 
-def submit_job(script, command, args=[], env={}):
+def submit_job(script, command, args=[], inputs=None, env={}):
     # args should be given before the script
     command = ["sbatch"] + args + [script] + command
     result = sys_call(command, env=env)
@@ -52,7 +52,7 @@ def submit_job(script, command, args=[], env={}):
     job_name = None
     # TODO: make hash of input payload as the job name and assign it
     with capp.db.session as s:
-        j = Job(id=job_id)
+        j = Job(id=job_id, input=inputs)
         s.add(j)
         if g.request_log:
             g.request_log.job_id = job_id

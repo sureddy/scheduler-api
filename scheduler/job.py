@@ -141,10 +141,13 @@ def create_job():
     req_type = request.args.get('type', 'bash')
     payload = request.get_json()
     env = os.environ
+    inputs = None
+
     if req_type == 'cwl':
         command, env = capp.cwl.construct_script(payload)
         script = resource_filename(
             'scheduler', 'resources/slurm/scripts/cwl.py')
+        inputs = payload.get("inputs")
 
     elif req_type == 'bash':
         assert_admin()
@@ -155,7 +158,7 @@ def create_job():
     else:
         raise UserError("{} type not supported".format(req_type))
     return jsonify(
-        slurm.submit_job(script, command, payload.get("args", []), env=env))
+        slurm.submit_job(script, command, payload.get("args", []), inputs=inputs, env=env))
 
 
 @blueprint.route("/<jid>", methods=['PUT'])
