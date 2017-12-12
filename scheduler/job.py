@@ -17,6 +17,33 @@ blueprint = flask.Blueprint('job', __name__)
 def get_job(jid):
     return jsonify(slurm.get_job(jid))
 
+@blueprint.route("/<jid>/outputs", methods=['GET'])
+@basic_auth
+def get_job_outputs(jid):
+    job = slurm.get_job(jid)
+    out = None
+    if job['output']: 
+        try:
+            out = json.loads(job['output']) 
+        except ValueError:
+            out = None
+
+    ret = {
+      "id": job["id"],
+      "state": job['state'],
+      "outputs": out
+    } 
+    return jsonify(ret), 200
+
+@blueprint.route("/<jid>/status", methods=['GET'])
+@basic_auth
+def get_job_status(jid):
+    job = slurm.get_job(jid)
+    ret = {
+      "id": job["id"],
+      "state": job['state']
+    } 
+    return jsonify(ret), 200
 
 @blueprint.route("/<jid>", methods=['DELETE'])
 @basic_auth
