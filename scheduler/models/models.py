@@ -19,8 +19,18 @@ class DictMixin(object):
 
 class Job(DictMixin, Base):
     __tablename__ = 'job'
-    # job id created by slurm
-    id = Column(String, primary_key=True)
+
+    # main id
+    id = Column(Integer, primary_key=True)
+
+    # generated UUID for job
+    job_uuid = Column(String(36), nullable=False, unique=True, index=True)
+ 
+    # job id created by the downstream scheduler/task/engine handler (e.g., SLURM, rabix, etc) 
+    engine_id = Column(String, nullable=False, index=True) 
+
+    # checksum (SHA256)
+    checksum = Column(String(64), nullable=False, index=True)
 
     # optionally set by user as an identifier
     job_name = Column(String)
@@ -37,7 +47,7 @@ class Job(DictMixin, Base):
 
     # job output, reported by
     # resources/slurm/script/cwl.py
-    output = Column(String)
+    output = Column(JSON(none_as_null=True))
 
     # cwl workflow running step,
     # reported by reousrces/slurm/script/cwl.py
@@ -79,7 +89,7 @@ class RequestLog(DictMixin, Base):
     __tablename__ = "request_log"
 
     id = Column(Integer, primary_key=True)
-    job_id = Column(String, ForeignKey("job.id"))
+    job_id = Column(String(36), ForeignKey("job.job_uuid"))
     job = relationship("Job", backref="requests")
 
     # might be a user does not exist, so it's not a foreignkey
