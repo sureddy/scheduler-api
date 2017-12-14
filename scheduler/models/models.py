@@ -25,6 +25,9 @@ class Job(DictMixin, Base):
 
     # generated UUID for job
     job_uuid = Column(String(36), nullable=False, unique=True, index=True)
+
+    # CWL document
+    workflow = Column(JSON(none_as_null=True))
  
     # job id created by the downstream scheduler/task/engine handler (e.g., SLURM, rabix, etc) 
     engine_id = Column(String, nullable=False, index=True) 
