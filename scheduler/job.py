@@ -8,39 +8,61 @@ from resources import slurm
 from flask import request, jsonify
 from flask import current_app as capp
 
+from scheduler.utils import get_payload_hash
+from scheduler.utils import uuidstr
 
 blueprint = flask.Blueprint('job', __name__)
 
+SUPPORTED_JOB_IDS = ('job_uuid', 'checksum')
 
 @blueprint.route("/<jid>", methods=['GET'])
 @basic_auth
 def get_job(jid):
-    return jsonify(slurm.get_job(jid))
+    req_type = request.args.get('type', 'job_uuid')
+    if req_type not in SUPPORTED_JOB_IDS: 
+        raise UserError("{} type not supported".format(req_type))
+    return jsonify(slurm.get_job(jid, id_type=req_type))
 
 @blueprint.route("/<jid>/outputs", methods=['GET'])
 @basic_auth
 def get_job_outputs(jid):
-    job = slurm.get_job(jid)
-    out = None
-    if job['output']: 
-        try:
-            out = json.loads(job['output']) 
-        except ValueError:
-            out = None
-
+    req_type = request.args.get('type', 'job_uuid')
+    if req_type not in SUPPORTED_JOB_IDS: 
+        raise UserError("{} type not supported".format(req_type))
+    job = slurm.get_job(jid, id_type=req_type)
     ret = {
-      "id": job["id"],
+      "job_uuid": job["job_uuid"],
+      "checksum": job["checksum"],
       "state": job['state'],
-      "outputs": out
+      "output": job['output']
+    } 
+    return jsonify(ret), 200
+
+@blueprint.route("/<jid>/inputs", methods=['GET'])
+@basic_auth
+def get_job_inputs(jid):
+    req_type = request.args.get('type', 'job_uuid')
+    if req_type not in SUPPORTED_JOB_IDS: 
+        raise UserError("{} type not supported".format(req_type))
+    job = slurm.get_job(jid, id_type=req_type)
+    ret = {
+      "job_uuid": job["job_uuid"],
+      "checksum": job["checksum"],
+      "state": job['state'],
+      "input": job['input']
     } 
     return jsonify(ret), 200
 
 @blueprint.route("/<jid>/status", methods=['GET'])
 @basic_auth
 def get_job_status(jid):
-    job = slurm.get_job(jid)
+    req_type = request.args.get('type', 'job_uuid')
+    if req_type not in SUPPORTED_JOB_IDS: 
+        raise UserError("{} type not supported".format(req_type))
+    job = slurm.get_job(jid, id_type=req_type)
     ret = {
-      "id": job["id"],
+      "job_uuid": job["job_uuid"],
+      "checksum": job["checksum"],
       "state": job['state']
     } 
     return jsonify(ret), 200
@@ -48,7 +70,10 @@ def get_job_status(jid):
 @blueprint.route("/<jid>", methods=['DELETE'])
 @basic_auth
 def cancel_job(jid):
-    slurm.cancel_job(jid)
+    req_type = request.args.get('type', 'job_uuid')
+    if req_type not in SUPPORTED_JOB_IDS: 
+        raise UserError("{} type not supported".format(req_type))
+    slurm.cancel_job(jid, id_type=req_type)
     return "", 201
 
 
@@ -143,8 +168,18 @@ def create_job():
     env = os.environ
     inputs = None
 
+    # Generate uuid
+    job_uuid = uuidstr()
+
     if req_type == 'cwl':
-        command, env = capp.cwl.construct_script(payload)
+        # inject job_uuid
+        payload = capp.cwl.inject_job_uuid( payload, job_uuid )
+
+        # Get sha
+        payload_hash = get_payload_hash(payload)
+
+        # Construct 
+        command, env = capp.cwl.construct_script(payload, job_uuid)
         script = resource_filename(
             'scheduler', 'resources/slurm/scripts/cwl.py')
         inputs = payload.get("inputs")
@@ -158,7 +193,8 @@ def create_job():
     else:
         raise UserError("{} type not supported".format(req_type))
     return jsonify(
-        slurm.submit_job(script, command, payload.get("args", []), inputs=inputs, env=env))
+        slurm.submit_job(script, command, job_uuid, payload_hash, 
+                         payload.get("args", []), inputs=inputs, env=env))
 
 
 @blueprint.route("/<jid>", methods=['PUT'])
