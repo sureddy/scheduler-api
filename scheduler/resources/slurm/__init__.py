@@ -45,21 +45,27 @@ def list_job():
 
 
 def submit_job(script, command, job_uuid, payload_hash, 
-               args=[], inputs=None, env={}):
+               args=[], inputs=None, workflow=None, env={}):
     # args should be given before the script
     command  = ["sbatch"] + args + [script] + command
-    result   = sys_call(command, env=env)
-    slurm_id = result.split()[-1]
+
     job_name = None
     # TODO: Should we standardize the job name? 
     with capp.db.session as s:
         j = Job(
             job_uuid=job_uuid, 
-            engine_id=slurm_id,
+            #engine_id=slurm_id,
             checksum=payload_hash,
-            input=inputs
+            input=inputs,
+            workflow=workflow
         )
         s.add(j)
+
+        result   = sys_call(command, env=env)
+        slurm_id = result.split()[-1]
+        j.update(engine_id=slurm_id)
+        s.merge(j)
+
         if g.request_log:
             g.request_log.job_id = job_uuid 
         s.merge(g.request_log)
