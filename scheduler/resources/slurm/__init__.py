@@ -44,55 +44,73 @@ def list_job():
     return {'jobs': parse_output(sys_call("squeue"))}
 
 
-def submit_job(script, command, args=[], inputs=None, env={}):
+def submit_job(script, command, job_uuid, payload_hash, 
+               args=[], inputs=None, env={}):
     # args should be given before the script
-    command = ["sbatch"] + args + [script] + command
-    result = sys_call(command, env=env)
-    job_id = result.split()[-1]
+    command  = ["sbatch"] + args + [script] + command
+    result   = sys_call(command, env=env)
+    slurm_id = result.split()[-1]
     job_name = None
-    # TODO: make hash of input payload as the job name and assign it
+    # TODO: Should we standardize the job name? 
     with capp.db.session as s:
-        j = Job(id=job_id, input=inputs)
+        j = Job(
+            job_uuid=job_uuid, 
+            engine_id=slurm_id,
+            checksum=payload_hash,
+            input=inputs
+        )
         s.add(j)
         if g.request_log:
-            g.request_log.job_id = job_id
+            g.request_log.job_id = job_uuid 
         s.merge(g.request_log)
 
-    return {'job': job_id}
+    return {'job_uuid': job_uuid, "checksum": payload_hash}
 
 
-def cancel_job(jid):
+def cancel_job(jid, id_type='job_uuid'):
     # make sure job exist
+    slurm_id = None
     with capp.db.session as s:
-        _find_job(jid, s)
-    sys_call(["scancel", str(jid)])
+        filter_column = Job.job_uuid if id_type == 'job_uuid' else Job.checksum
+        j = _find_job(jid, s, filter_column)
+        slurm_id = j.engine_id
+    sys_call(["scancel", str(slurm_id)])
 
 
-def get_job(jid):
+def get_job(jid, id_type='job_uuid'):
+    filter_column = Job.job_uuid if id_type == 'job_uuid' else Job.checksum
     with capp.db.session as s:
-        j = _find_job(jid, s)
+        j = _find_job(jid, s, filter_column)
         return j.todict()
 
 
 # find job, sync with slurm, and also link to request log
 ## KMH: change to get more data and output using the --parsable2 flag
-def _find_job(jid, session):
-    job_obj = session.query(Job).get(jid)
+def _find_job(sid, session, filter_column=Job.job_uuid):
+    job_obj = session.query(Job).filter(filter_column == sid).first()
+    if not job_obj:
+        raise UserError("Problem finding record for job {0}".format(sid))
+
+    # Get slurm id
+    jid = job_obj.job_uuid
+    slurm_id = job_obj.engine_id
+
     job_elements = ["JobID", "JobName", "NodeList", "State", "ExitCode", "ElapsedRaw", 
         "AveDiskRead", "MaxDiskRead", "AveDiskWrite", "MaxDiskWrite",
         "AveVMSize", "MaxVMSize", "AveRSS", "MaxRSS", "Start", "State", 
         "Submit", "End"]
     result = parse_output(
-        sys_call(["sacct", "-j", str(jid),
+        sys_call(["sacct", "-j", str(slurm_id),
                  "--format", ",".join(job_elements),
                  "--parsable2",
                  "--units=M"]))
 
-    if not job_obj:
-        if len(result) == 0:
-            raise JobNotFound(jid)
-        else:
-            job_obj = Job(id=jid)
+    # NOTE: I don't see how this will work after changing to hash identifier
+    #if not job_obj:
+    #    if len(result) == 0:
+    #        raise JobNotFound(jid)
+    #    else:
+    #        job_obj = Job(id=jid)
 
     if len(result) > 0:
         # If any of the returned job data are from the slurm 'batch' job,
@@ -111,10 +129,11 @@ def _find_job(jid, session):
                 if key not in ("JobID", "JobName"):
                     r[key] = baj[key]
         else:
-            UserError("Problem finding record for jobid {0}".format(jid))
+            raise UserError("Problem finding record for jobid {0}".format(jid))
              
         job = {
-            'id': r['JobID'], 
+            'job_uuid': jid, 
+            'engine_id': r['JobID'],
             'job_name': r['JobName'],
             'exit_code': r['ExitCode'],
             'nodelist': r['NodeList'],
@@ -136,7 +155,7 @@ def _find_job(jid, session):
         session.merge(job_obj)
 
     if g.request_log:
-        g.request_log.job_id = job_obj.id
+        g.request_log.job_id = job_obj.job_uuid
         session.merge(g.request_log)
     return job_obj
 
@@ -153,7 +172,10 @@ def format_slurm_datetime(val):
 
 def format_slurm_mb_size(val):
     #NOTE: You must use --units=M in sacct! 
-    if val and val != 'Unknown' and val != '0':
+    if val and val != 'Unknown':
+        if val == '0':
+            return float(val)
+
         # Should prob capture err
         assert val[-1] == 'M', "Expect MB but got {}".format(val)
         #try: 
