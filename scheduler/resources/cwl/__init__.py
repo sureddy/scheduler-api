@@ -113,7 +113,23 @@ class CWLLibrary(object):
             raise UserError("Have to use docker for CommandLineTool")
         return document['id']
 
-    def construct_script(self, payload):
+    def inject_job_uuid(self, payload, uuid, key='job_uuid'):
+        """
+        inject the uuid into the payload's input dictionary as
+        the key provided.
+
+        """ 
+        inputs = payload.get('inputs')
+        if inputs is None:
+            payload['inputs'] = {key: uuid}
+
+        else:
+            if key in inputs:
+                raise UserError("Job uuid already exists in input payload!")
+            payload['inputs'][key] = uuid
+        return payload
+
+    def construct_script(self, payload, job_uuid):
         """
         construct a command to be executed by subprocess
         input_files is dumped to environment variable so that
@@ -134,7 +150,8 @@ class CWLLibrary(object):
             if 'input_files' in payload:
                 os.environ['input_files'] = json.dumps(payload['input_files'])
 
-            script = ["--inputs", json.dumps(payload['inputs']),
+            script = ["--job-uuid", job_uuid,
+                      "--inputs", json.dumps(payload['inputs']),
                       "--cwl", json.dumps(cwl_content),
                       "--workflow-id", doc_id]
             if capp.config['PROXIES']:
