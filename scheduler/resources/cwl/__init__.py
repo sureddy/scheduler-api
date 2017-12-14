@@ -150,10 +150,7 @@ class CWLLibrary(object):
             if 'input_files' in payload:
                 os.environ['input_files'] = json.dumps(payload['input_files'])
 
-            script = ["--job-uuid", job_uuid,
-                      "--inputs", json.dumps(payload['inputs']),
-                      "--cwl", json.dumps(cwl_content),
-                      "--workflow-id", doc_id]
+            script = ["--job-uuid", job_uuid, "--workflow-id", doc_id]
             if capp.config['PROXIES']:
                 script.append("--proxies")
             return script, os.environ
