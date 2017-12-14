@@ -173,7 +173,7 @@ def create_job():
 
     if req_type == 'cwl':
         # inject job_uuid
-        payload = capp.cwl.inject_job_uuid( payload, job_uuid )
+        payload = capp.cwl.inject_job_uuid( payload, job_uuid, key="task_uuid" )
 
         # Get sha
         payload_hash = get_payload_hash(payload)
@@ -194,7 +194,8 @@ def create_job():
         raise UserError("{} type not supported".format(req_type))
     return jsonify(
         slurm.submit_job(script, command, job_uuid, payload_hash, 
-                         payload.get("args", []), inputs=inputs, env=env))
+                         payload.get("args", []), inputs=inputs, 
+                         workflow=payload["document"], env=env))
 
 
 @blueprint.route("/<jid>", methods=['PUT'])
