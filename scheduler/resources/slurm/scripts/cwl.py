@@ -8,6 +8,7 @@ import hashlib
 import subprocess
 import argparse
 import time
+import base64
 from threading import Thread
 import logging
 
@@ -20,14 +21,12 @@ ROOT_DIR = "/mnt/SCRATCH"
 def run():
     parser = argparse.ArgumentParser(description="CWL runner")
     parser.add_argument('--job-uuid', type=str, required=True, help='job uuid')
-    parser.add_argument('--cwl', type=str, help='cwl file')
     parser.add_argument('--workflow-id', type=str, help='id of your workflow')
-    parser.add_argument('--inputs', type=str, help='input json')
     parser.add_argument('--proxies',
                         action='store_true', help='use http proxy')
 
     args = parser.parse_args()
-    run_cwl(args.job_uuid, args.cwl, args.inputs, args.workflow_id, args.proxies)
+    run_cwl(args.job_uuid, args.workflow_id, args.proxies)
 
 
 def write_input_files(input_files):
@@ -49,10 +48,12 @@ def setup_files(cwl, inputs, identifier):
         write_input_files(os.environ['input_files'])
     tmp_cwl = identifier + '.cwl'
     input_json = identifier + '.json'
-    with open(tmp_cwl, 'w') as f:
-        f.write(cwl)
-    with open(input_json, 'w') as f:
-        f.write(inputs)
+    with open(tmp_cwl, 'wt') as f:
+        #f.write(cwl)
+        json.dump(cwl, f)
+    with open(input_json, 'wt') as f:
+        #f.write(inputs)
+        json.dump(inputs, f)
     return tmp_cwl, input_json
 
 
@@ -68,12 +69,15 @@ def listen_output(stderr, report_url):
     stderr.close()
 
 
-def run_cwl(job_uuid, cwl, inputs, workflow_id, proxies):
-    identifier = os.getenv('SLURM_JOB_ID', hashlib.sha1(str(time.time())))
-    workdir = set_workdir(identifier)
+def run_cwl(job_uuid, workflow_id, proxies):
+    # Get cwl
     #TODO: handle the user auth 
     report_url = ("http://test:test@{}:5000/jobs/{}"
                   .format(os.environ['SLURM_SUBMIT_HOST'], job_uuid))
+    cwl, inputs = get_cwl_and_inputs(report_url, job_uuid)
+    identifier = os.getenv('SLURM_JOB_ID', hashlib.sha1(str(time.time())))
+    workdir = set_workdir(identifier)
+
     try:
         cwl_file, input_file = setup_files(
             cwl, inputs, identifier)
@@ -120,6 +124,15 @@ def run_cwl(job_uuid, cwl, inputs, workflow_id, proxies):
     finally:
         shutil.rmtree(workdir)
 
+
+def get_cwl_and_inputs(report_url, job_uuid):
+    r = requests.get(report_url)
+    if r.status_code != 200:
+        print r.text
+        raise RuntimeError("Unable to get CWL")
+
+    res = r.json()
+    return res["workflow"], res["input"]
 
 def report_to_scheduler(report_url, data):
     try:
