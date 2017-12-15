@@ -77,6 +77,10 @@ def run_cwl(job_uuid, workflow_id, proxies):
     cwl, inputs = get_cwl_and_inputs(report_url, job_uuid)
     identifier = os.getenv('SLURM_JOB_ID', hashlib.sha1(str(time.time())))
     workdir = set_workdir(identifier)
+    tmpdir = os.path.join(workdir, 'tmp')
+    os.makedirs(tmpdir)
+    cachedir = os.path.join(workdir, 'cache')
+    os.makedirs(cachedir)
 
     try:
         cwl_file, input_file = setup_files(
@@ -87,8 +91,12 @@ def run_cwl(job_uuid, workflow_id, proxies):
 
         #TODO: allow user to provide cwl path
         #TODO: allow user to provide CWL flags 
-        cwl_other_opts = ["--rm-tmpdir", "--rm-container", "--custom-net", "bridge"]
-        cmd = ["/home/ubuntu/.virtualenvs/p2/bin/cwltool"] + \
+        cwl_other_opts = ["--rm-tmpdir", "--no-read-only", "--no-match-user", 
+                          "--rm-container", "--custom-net", "bridge",
+                          "--tmp-outdir-prefix", cachedir + '/', 
+                          "--tmpdir-prefix", tmpdir + '/']
+        #cmd = ["/home/ubuntu/.virtualenvs/p2/bin/cwltool"] + \
+        cmd = ["/home/ubuntu/.virtualenvs/cwl_mirna/bin/cwltool"] + \
             cwl_other_opts + \
             [cwl_file+workflow_id, input_file]
         #p = subprocess.Popen(["/home/ubuntu/.virtualenvs/p2/bin/cwltool", 
