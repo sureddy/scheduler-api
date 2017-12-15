@@ -1,0 +1,185 @@
+swagger: '2.0'
+info:
+  title: scheduler_api
+  description: |
+    The purpose of this API is to:
+    * Submit jobs to a scheduler
+    * Provide state and metrics of jobs
+    * Cancel a given job
+  version: version not set
+schemes:
+  - http
+tags:
+  - name: JobSchedulerService
+    description: All job scheduling services
+paths:
+  /jobs:
+    post:
+      summary: >-
+        Run a workflow, this endpoint will allow you to create a new workflow
+        request and retrieve its tracking ID to monitor its process
+      description: ''
+      operationId: RunWorkflow
+      responses:
+        '200':
+          description: ''
+          schema:
+            $ref: '#/definitions/scheduler_api_job_id'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/scheduler_api_request'
+        - name: type
+          in: query
+          required: false
+          type: string
+      tags:
+        - JobSchedulerService
+  '/jobs/{job_id}':
+    get:
+      summary: Get detailed info about a running job
+      operationId: GetWorkflowInfo
+      responses:
+        '200':
+          description: ''
+          schema:
+            $ref: '#/definitions/scheduler_api_job_info'
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          type: string
+        - name: type
+          in: query
+          required: false
+          type: string
+      tags:
+        - JobSchedulerService
+    delete:
+      summary: Cancel a job
+      operationId: CancelJob
+      responses:
+        '201':
+          description: ''
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          type: string
+        - name: type
+          in: query
+          required: false
+          type: string
+      tags:
+        - JobSchedulerService
+    put:
+      summary: Update the status of a job
+      operationId: UpdateJob
+      responses:
+        '200':
+          description: OK
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          type: string
+        - name: type
+          in: query
+          required: false
+          type: string
+      tags:
+        - JobSchedulerService
+definitions:
+  scheduler_api_request:
+    type: object
+    properties:
+      args:
+        type: array
+        items:
+          type: string
+        title: Command line options to pass to the scheduler
+      inputs:
+        type: string
+        title: Inputs to workflow as a JSON object
+      document:
+        type: string
+        title: |-
+          REQUIRED
+          The workflow document
+    title: job request object
+  scheduler_api_job_id:
+    type: object
+    properties:
+      checksum:
+        type: string
+        title: sha256 checksum of the scheduler_api_request
+      job_uuid:
+        type: string
+        title: The job UUID
+  job_id_type:
+    type: string
+    enum:
+      - checksum
+      - job_uuid
+    default: job_uuid
+    title: Enum for job ID types
+  scheduler_api_job_info:
+    type: object
+    properties:
+      id:
+        type: integer
+        title: internal database ID
+      job_uuid:
+        type: string
+        title: Job UUID
+      workflow:
+        type: string
+        title: Workflow document as JSON
+      engine_id:
+        type: string
+        title: Backend scheduler engine ID
+      checksum:
+        type: string
+        title: scheduler_api_request checksum
+      job_name:
+        type: string
+        title: Optional job name
+      state:
+        type: string
+        title: Job state (NEED TO MAKE ENUM)
+      log:
+        type: string
+        title: Logs from executed task
+      input:
+        type: string
+        title: Inputs to workflow as a JSON object
+      output:
+        type: string
+        title: Outputs from completed workflow as a JSON object
+      running_state:
+        type: string
+        title: Last executed step from workflow
+      exit_code:
+        type: string
+        title: Exit code
+      nodelist:
+        type: string
+        title: Executed node hostname
+      submit_time:
+        type: string
+        title: Submission date time
+      start_time:
+        type: string
+        title: Start date time
+      end_time:
+        type: string
+        title: Stop date time
+      elapsed_seconds:
+        type: integer
+        title: Elapsed seconds
